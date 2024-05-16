@@ -221,12 +221,16 @@ def qna():
         """, (question_session_id, question_id))
         previous_qas = cursor.fetchall()
 
+        # Retrieve intro_message and system_prompt from the database
+        intro_message = get_system_input_text('intro_message')
+        system_prompt = get_system_input_text('system_prompt')
+
         # Construct context for the current question
         context = ' '.join([f"Q: {qa[0]} A: {qa[1]}" for qa in previous_qas if qa[1]])
-        full_query = f"{context} Current Question: {question}"
+        full_query = f"{intro_message}\n\n{context} Current Question: {question}"
 
         # Invoke the model
-        response_text, sources = query_rag(full_query)
+        response_text, sources = query_rag(full_query, system_prompt)
 
         # Update the database with the answer
         cursor.execute("""
@@ -246,8 +250,15 @@ def qna():
         return jsonify({'error': str(e)}), 500
 
 
+def get_system_input_text(text_type):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT text FROM system_input_text WHERE text_type = ?", (text_type,))
+    row = cursor.fetchone()
+    return row[0] if row else ""
 
-def query_rag(query_text: str):
+
+def query_rag(query_text: str, system_prompt: str):
     db = get_chroma_instance()
     results = db.similarity_search_with_score(query_text, k=5)
 
@@ -258,10 +269,13 @@ def query_rag(query_text: str):
     prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
     prompt = prompt_template.format(context=context_text, question=query_text)
 
+    # Combine system_prompt with the formatted prompt
+    full_prompt = f"{system_prompt}\n\n{prompt}"
+
     response = openai.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": full_prompt}
         ]
     )
 
