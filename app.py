@@ -38,6 +38,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 CHROMA_PATH = "chroma"
+
 PROMPT_TEMPLATE = """
 Answer the question based only on the following context:
 
@@ -273,7 +274,8 @@ def query_rag(query_text: str, system_prompt: str):
     full_prompt = f"{system_prompt}\n\n{prompt}"
 
     response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
+        # model="gpt-3.5-turbo",
+        model="gpt-4o",
         messages=[
             {"role": "user", "content": full_prompt}
         ]
@@ -515,6 +517,14 @@ def get_all_chunk_ids():
 @app.route('/test_connection', methods=['GET'])
 def test():
     return jsonify({'message': 'Success'}), 200
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return jsonify({'error': 'Page not found'}), 404
+
+@app.route('/')
+def home():
+    return jsonify({'message': 'Welcome to the Bluestone AI API!'})
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5001)
